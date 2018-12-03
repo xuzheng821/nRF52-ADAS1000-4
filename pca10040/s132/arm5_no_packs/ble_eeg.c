@@ -20,7 +20,6 @@
  */
 
 #include "ble_eeg.h"
-#include "ads1299-x.h"
 #include "app_error.h"
 #include "app_util.h"
 #include "ble_srv_common.h"

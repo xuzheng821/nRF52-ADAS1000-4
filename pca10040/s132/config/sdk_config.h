@@ -12,7 +12,7 @@
 
 
 #ifndef LEDS_ENABLE
-#define LEDS_ENABLE 1
+#define LEDS_ENABLE 0
 #endif
 
 //==========================================================
