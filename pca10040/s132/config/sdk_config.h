@@ -2659,7 +2659,7 @@
 // <e> TWI1_ENABLED - Enable TWI1 instance
 //==========================================================
 #ifndef TWI1_ENABLED
-#define TWI1_ENABLED 1
+#define TWI1_ENABLED 0
 #endif
 #if  TWI1_ENABLED
 // <q> TWI1_USE_EASY_DMA  - Use EasyDMA (if present)
@@ -3730,16 +3730,6 @@
 #ifndef NRF_LOG_USES_COLORS
 #define NRF_LOG_USES_COLORS 0
 #endif
-//Additional Config Stuff: (Musa Mahmood; 08-09-2017)
-
-#ifndef LOG_HIGH_DETAIL
-#define LOG_HIGH_DETAIL 0
-#endif
-
-#ifndef LOG_LOW_DETAIL
-#define LOG_LOW_DETAIL 1
-#endif
-
 
 #if  NRF_LOG_USES_COLORS
 // <o> NRF_LOG_COLOR_DEFAULT  - ANSI escape code prefix.

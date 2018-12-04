@@ -80,6 +80,7 @@
 #include "nrf_log_ctrl.h"
 
 #if defined(ADAS1000_4)
+#include "adas1000-4.h"
 #include "ble_dis.h"
 #include "ble_eeg.h"
 #define DEVICE_MODEL_NUMBERSTR "Version 1.0"
@@ -88,6 +89,10 @@ ble_eeg_t m_eeg;
 static bool m_connected = false;
 //#include "nrf_delay.h"
 #include "nrf_drv_gpiote.h"
+#endif
+
+#if defined (ADAS1000_4_BOARD_V1)
+#include "custom_board.h"
 #endif
 
 #if defined(APP_TIMER_SAMPLING) && APP_TIMER_SAMPLING == 1
@@ -650,7 +655,9 @@ static void advertising_start(void) {
 void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action) {
   UNUSED_PARAMETER(pin);
   UNUSED_PARAMETER(action);
-  // Conduct
+  // Conduct Actions:
+  m_samples += 1;
+//  NRF_LOG_INFO("DRDY, in_pin triggered. \r\n");
 }
 #endif
 
@@ -666,10 +673,44 @@ static void adas_gpio_init(void) {
   nrf_gpio_pin_set(TPS63051_ILIM0); // Also set high (See datasheet)
     // TODO: Config PG pin as Input: 
   nrf_gpio_pin_dir_set(TPS63051_PG, NRF_GPIO_PIN_DIR_INPUT);
+  nrf_gpio_pin_pull_t pull_config = NRF_GPIO_PIN_NOPULL;
+  nrf_gpio_cfg_input(TPS63051_PG, pull_config);
   /* §2. CLK DSC1001 Standby Pin */
   nrf_gpio_pin_dir_set(CLK_DSC1001_STANDBY, NRF_GPIO_PIN_DIR_OUTPUT);
   nrf_gpio_cfg_output(CLK_DSC1001_STANDBY);
+  nrf_gpio_pin_clear(CLK_DSC1001_STANDBY);
   NRF_LOG_INFO("TPS63051 Enabled (Pins 19, 20 Cleared) \r\n");
+  /* adas1000-4 */
+    //~RESET
+  nrf_gpio_pin_dir_set(ADAS1000_4_RESET, NRF_GPIO_PIN_DIR_OUTPUT);
+  nrf_gpio_cfg_output(ADAS1000_4_RESET);
+    //~PD:
+  nrf_gpio_pin_dir_set(ADAS1000_4_PWDN, NRF_GPIO_PIN_DIR_OUTPUT);
+  nrf_gpio_cfg_output(ADAS1000_4_PWDN);
+
+  adas_powerdown();
+//  /*
+  // Initialize DRDY as Input:
+  // 1. Initialize GPIOTE Drivers:
+  uint32_t err_code;
+  if (!nrf_drv_gpiote_is_init()) {
+    err_code = nrf_drv_gpiote_init();
+  }
+  NRF_LOG_RAW_INFO(" GPIOTE Drivers init (nrf_drv_gpiote_init) Response: %d\r\n", err_code); NRF_LOG_FLUSH();
+  APP_ERROR_CHECK(err_code);
+  // 2. Set DRDY as input:
+  nrf_gpio_pin_dir_set(ADAS1000_4_DRDY, NRF_GPIO_PIN_DIR_INPUT); 
+  // 3. Set gpiote input handler:
+  bool is_high_accuracy = true;
+  nrf_drv_gpiote_in_config_t in_config = GPIOTE_CONFIG_IN_SENSE_HITOLO(is_high_accuracy);
+    in_config.is_watcher = true;
+    in_config.pull = NRF_GPIO_PIN_NOPULL;
+  err_code = nrf_drv_gpiote_in_init(ADAS1000_4_DRDY, &in_config, in_pin_handler);
+  NRF_LOG_RAW_INFO(" DRDY GPIOTE_IN INIT: %d: \r\n", err_code); NRF_LOG_FLUSH();
+  APP_ERROR_CHECK(err_code);
+  nrf_drv_gpiote_in_event_enable(ADAS1000_4_DRDY, true);
+  // Disable until everything else (BLE/SD) is up
+//  */
 }
 
 static void wait_for_event(void) {
@@ -683,7 +724,6 @@ int main(void) {
   // Initialize.
   log_init();
   timers_init();
-  // NOTE: Critical to init gpio at this time, or device will not boot:
 #if ADAS1000_4
   adas_gpio_init();
 #endif
@@ -693,9 +733,14 @@ int main(void) {
   advertising_init();
   services_init();
   conn_params_init();
-#if defined(ADAS1000_4)
-  // ADAS Power up Routine
-    
+#if defined(ADAS1000_4) // Power Up Routine (See Datasheet):
+  adas_powerup();
+  adas_reset_regs(); // Uses gpio
+  adas_spi_init();
+  // Write Default Registers:
+//  adas_write_default_registers();
+  // Begin Transactions:
+//  adas_begin_frame_transactions();
 #endif
   // Start execution.
   application_timers_start();
@@ -709,7 +754,7 @@ int main(void) {
 #if NRF_LOG_ENABLED == 1
   for (;;) {
     if (!NRF_LOG_PROCESS()) {
-      wait_for_event();
+      power_manage();
     }
   }
 #endif
