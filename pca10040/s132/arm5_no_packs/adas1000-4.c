@@ -30,7 +30,7 @@ void adas_spi_init(void) {
   nrf_drv_spi_config_t spi_config = NRF_DRV_SPI_DEFAULT_CONFIG;
   spi_config.bit_order = NRF_DRV_SPI_BIT_ORDER_MSB_FIRST;
   //SCLK = 1MHz is right speed because fCLK = (1/2)*SCLK, and fMOD = fCLK/4, and fMOD MUST BE 128kHz. Do the math.
-  spi_config.frequency = NRF_DRV_SPI_FREQ_4M;
+  spi_config.frequency = NRF_DRV_SPI_FREQ_1M;
   spi_config.irq_priority = APP_IRQ_PRIORITY_HIGHEST; //APP_IRQ_PRIORITY_HIGHEST;
   spi_config.mode = NRF_DRV_SPI_MODE_3;               //CPOL = 1 (Active Low); CPHA = TRAILING (1)
   spi_config.miso_pin = ADAS1000_4_SDO;               //Master (nrf) in, slave (adas) out
@@ -74,33 +74,80 @@ void adas_reset_regs(void) {
 
 void adas_write_register(uint8_t addr, uint32_t value) {
   // TX DATA [REG ADDR, BITS 23:16, BITS 15:8, BITS 7:0]
-  uint8_t tx_data[4] = {0x80 + addr, (uint8_t)(value & 0xFF0000) >> 16, (uint8_t)(value & 0x00FF00) >> 8, (uint8_t)(value & 0x0000FF) >> 0};
+  uint8_t tx_data[4];
+  tx_data[0] = (uint8_t) 0x00 + addr;
+  tx_data[1] = (uint8_t)((value >> 16) & 0xFF);
+  tx_data[2] = (uint8_t)((value >> 8) & 0xFF);
+  tx_data[3] = (uint8_t)(value & 0xFF);
+  spi_xfer_done = false;
+  NRF_LOG_HEXDUMP_DEBUG(tx_data, 4);
   APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, tx_data, 4, NULL, NULL));
-}
-
-void adas_read_register(uint8_t addr, uint32_t *value) {
-  uint8_t tx_data[4] = {addr, 0, 0, 0};
-  uint8_t rx_data[4] = {0, 0, 0, 0};
-  APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, tx_data, 4, rx_data, 4));
-  *value = ((uint32_t)rx_data[1] << 16) + ((uint32_t)rx_data[2] << 8) + ((uint32_t)rx_data[3] << 0);
+  while (!spi_xfer_done) {
+    __WFE();
+  }
 }
 
 void adas_write_default_registers(void) {
-  uint8_t num_registers = 1;
-  bool write_opcode[] = {true, true, true, false}; 
-  uint8_t register_addresses[] = {0x05, 0x0A, 0x01};
-  uint32_t registers_values[] = {0x00E0000B, 0x001F9600, 0x00E004AE};
-  uint8_t i = 0;
+  uint8_t num_registers = 4;
+  uint8_t register_addresses[4] = {0x85, 0x8A, 0x81, 0x40};
+  uint32_t registers_values[4] = {0x00E0000A, 0x001F9600, 0x00E000E6/*0x00E00406*/, 0x00000000};
+  uint8_t i;
   for (i = 0; i < num_registers; i++) {
     adas_write_register(register_addresses[i], registers_values[i]);
   }
   NRF_LOG_INFO(" ADAS1000-4 Default Registers Written. \r\n");
 }
 
-void adas_begin_frame_transactions(void) {
-  //Begins data transactions by reading FRAMES register (read 0x40):
-  //Read from 0x40:
-  uint32_t response = 0x00000000;
-  adas_read_register(0x40, &response);
-  NRF_LOG_INFO(" ADAS1000-4 Issuing FRAMES Read, Response: 0x00%X%X%X. \r\n", (uint8_t)(response & 0xFF0000) >> 16, (uint8_t)(response & 0x00FF00) >> 8, (uint8_t)(response & 0x0000FF) >> 0);
+void adas_read_register(uint8_t addr, uint32_t *value) {
+  uint8_t tx_data[4];
+  memset(tx_data, 0, 4);
+  tx_data[0] = (uint8_t)addr;
+  uint8_t rx_data[4];
+  memset(rx_data, 0, 4);
+  spi_xfer_done = false;
+  APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, tx_data, 4, rx_data, 4));
+  while (!spi_xfer_done) {
+    __WFE();
+  }
+  *value = ((uint32_t)rx_data[0] << 24) + ((uint32_t)rx_data[1] << 16) + ((uint32_t)rx_data[2] << 8) + ((uint32_t)rx_data[3] << 0);
 }
+
+void adas_read_default_registers(void) {
+    uint8_t num_registers = 4;
+    uint8_t register_addresses[4] = {0x85, 0x8A, 0x81, 0x40};
+    uint8_t i;
+    for (i = 0; i < num_registers; i++) {
+      uint32_t response;
+      adas_read_register(register_addresses[i], &response);
+      nrf_delay_ms(1);
+      NRF_LOG_HEXDUMP_DEBUG(response, 4);
+      
+    }
+}
+
+void adas_begin_frame_transactions(void) {
+  uint32_t response;
+  adas_read_register(0x40, &response);
+  NRF_LOG_HEXDUMP_DEBUG(response, 4);
+}
+
+void adas_read_frames(uint8_t number_frames) {
+    uint8_t tx_data[4 * number_frames];
+    memset(tx_data, 0, 4 * number_frames);
+
+    uint8_t rx_data[4 * number_frames];
+    memset(rx_data, 0, 4 * number_frames);
+    
+    spi_xfer_done = false;
+    APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, tx_data, 4 * number_frames, rx_data, 4 * number_frames));
+    while (!spi_xfer_done) {
+      __WFE();
+    }
+    NRF_LOG_HEXDUMP_DEBUG(rx_data, 4*number_frames);
+}
+
+//void adas_read_datapoint(void) {
+//  uint32_t response = 0x00000000;
+//  adas_read_register(0x00, &response);
+//  NRF_LOG_HEXDUMP_DEBUG(response, 4);
+//}

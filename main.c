@@ -91,7 +91,7 @@ static bool m_connected = false;
 #include "nrf_drv_gpiote.h"
 #endif
 
-#if defined (ADAS1000_4_BOARD_V1)
+#if defined(ADAS1000_4_BOARD_V1)
 #include "custom_board.h"
 #endif
 
@@ -102,11 +102,11 @@ static uint16_t m_samples;
 #endif
 #define APP_FEATURE_NOT_SUPPORTED BLE_GATT_STATUS_ATTERR_APP_BEGIN + 2 /**< Reply when unsupported features are requested. */
 
-#define DEVICE_NAME "HRRRECG"                 /**< Name of device. Will be included in the advertising data. */
-#define DEVICE_NAME_500 "HRRRECG-500Hz"       /**< Name of device. Will be included in the advertising data. */
-#define DEVICE_NAME_1k "HRRRECG-1kHz"         /**< Name of device. Will be included in the advertising data. */
-#define DEVICE_NAME_2k "HRRRECG-2kHz"         /**< Name of device. Will be included in the advertising data. */
-#define DEVICE_NAME_4k "HRRRECG-4kHz"         /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME "HRRRECG"           /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME_500 "HRRRECG-500Hz" /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME_1k "HRRRECG-1kHz"   /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME_2k "HRRRECG-2kHz"   /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME_4k "HRRRECG-4kHz"   /**< Name of device. Will be included in the advertising data. */
 
 #define MANUFACTURER_NAME "Potato Labs" /**< Manufacturer. Will be passed to Device Information Service. */
 #define APP_ADV_INTERVAL 300            /**< The advertising interval (in units of 0.625 ms. This value corresponds to 187.5 ms). */
@@ -165,9 +165,7 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t *p_file_name) {
 static void m_sampling_timeout_handler(void *p_context) {
   UNUSED_PARAMETER(p_context);
 #if defined(APP_TIMER_SAMPLING) && APP_TIMER_SAMPLING == 1
-#if LOG_LOW_DETAIL == 1
   NRF_LOG_INFO("SAMPLE RATE = %dHz \r\n", m_samples);
-#endif
   m_samples = 0;
 #endif
 }
@@ -348,11 +346,6 @@ static void application_timers_start(void) {
   err_code = app_timer_start(m_sampling_timer_id, TICKS_SAMPLING_INTERVAL, NULL);
   APP_ERROR_CHECK(err_code);
 #endif
-
-#if (defined(MPU60x0) || defined(MPU9150) || defined(MPU9250) || defined(MPU9255))
-  err_code = app_timer_start(m_mpu_send_timer_id, TICKS_MPU_SAMPLING_INTERVAL, NULL);
-  APP_ERROR_CHECK(err_code);
-#endif
 }
 
 /**@brief Function for putting the chip into sleep mode.
@@ -379,11 +372,6 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
   case BLE_ADV_EVT_FAST:
     NRF_LOG_INFO("Fast advertising.\r\n");
     APP_ERROR_CHECK(err_code);
-//#if defined(BOARD_EXG_V3)
-#if LEDS_ENABLE == 1
-    nrf_gpio_pin_clear(LED_2); // Green
-    nrf_gpio_pin_set(LED_1);   //Blue
-#endif
     break;
 
   case BLE_ADV_EVT_IDLE:
@@ -406,25 +394,14 @@ static void on_ble_evt(ble_evt_t *p_ble_evt) {
   case BLE_GAP_EVT_DISCONNECTED:
     NRF_LOG_INFO("Disconnected.\r\n");
     m_connected = false;
-#if LEDS_ENABLE == 1
-    nrf_gpio_pin_clear(LED_2); // Green
-    nrf_gpio_pin_set(LED_1);   //Blue
-#endif
     advertising_start();
     break; // BLE_GAP_EVT_DISCONNECTED
 
   case BLE_GAP_EVT_CONNECTED:
-
-#if LEDS_ENABLE == 1
-    nrf_gpio_pin_set(LED_2);
-    nrf_gpio_pin_clear(LED_1);
-#endif
     NRF_LOG_INFO("Connected.\r\n");
     m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
     m_connected = true;
-    //NOTE: send init registers to GATT:
-    //ble_eeg_update_configuration(&m_eeg, false);
-    break; // BLE_GAP_EVT_CONNECTED
+    break;
 
   case BLE_GATTC_EVT_TIMEOUT:
     // Disconnect on GATT Client timeout event.
@@ -657,60 +634,66 @@ void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action) {
   UNUSED_PARAMETER(action);
   // Conduct Actions:
   m_samples += 1;
-//  NRF_LOG_INFO("DRDY, in_pin triggered. \r\n");
+  NRF_LOG_INFO("DRDY, in_pin triggered. \r\n");
+  NRF_LOG_FLUSH();
+  if (m_connected) {
+    adas_read_frames(8);
+  }
 }
 #endif
 
 static void adas_gpio_init(void) {
   /* §1. TPS63051 for 3.3V regulation */
-    // EN_ pin
+  // EN_ pin
   nrf_gpio_pin_dir_set(TPS63051_EN, NRF_GPIO_PIN_DIR_OUTPUT);
   nrf_gpio_cfg_output(TPS63051_EN);
   nrf_gpio_pin_set(TPS63051_EN); //set high to enable
-    //ILIM0 Pin
+      //ILIM0 Pin
   nrf_gpio_pin_dir_set(TPS63051_ILIM0, NRF_GPIO_PIN_DIR_OUTPUT);
   nrf_gpio_cfg_output(TPS63051_ILIM0);
   nrf_gpio_pin_set(TPS63051_ILIM0); // Also set high (See datasheet)
-    // TODO: Config PG pin as Input: 
+      // TODO: Config PG pin as Input:
   nrf_gpio_pin_dir_set(TPS63051_PG, NRF_GPIO_PIN_DIR_INPUT);
   nrf_gpio_pin_pull_t pull_config = NRF_GPIO_PIN_NOPULL;
   nrf_gpio_cfg_input(TPS63051_PG, pull_config);
   /* §2. CLK DSC1001 Standby Pin */
   nrf_gpio_pin_dir_set(CLK_DSC1001_STANDBY, NRF_GPIO_PIN_DIR_OUTPUT);
   nrf_gpio_cfg_output(CLK_DSC1001_STANDBY);
-  nrf_gpio_pin_clear(CLK_DSC1001_STANDBY);
+  nrf_gpio_pin_set(CLK_DSC1001_STANDBY); //enable CLK
   NRF_LOG_INFO("TPS63051 Enabled (Pins 19, 20 Cleared) \r\n");
   /* adas1000-4 */
-    //~RESET
+  //~RESET
   nrf_gpio_pin_dir_set(ADAS1000_4_RESET, NRF_GPIO_PIN_DIR_OUTPUT);
   nrf_gpio_cfg_output(ADAS1000_4_RESET);
-    //~PD:
+  //~PD:
   nrf_gpio_pin_dir_set(ADAS1000_4_PWDN, NRF_GPIO_PIN_DIR_OUTPUT);
   nrf_gpio_cfg_output(ADAS1000_4_PWDN);
 
   adas_powerdown();
-//  /*
+  //  /*
   // Initialize DRDY as Input:
   // 1. Initialize GPIOTE Drivers:
   uint32_t err_code;
   if (!nrf_drv_gpiote_is_init()) {
     err_code = nrf_drv_gpiote_init();
   }
-  NRF_LOG_RAW_INFO(" GPIOTE Drivers init (nrf_drv_gpiote_init) Response: %d\r\n", err_code); NRF_LOG_FLUSH();
+  NRF_LOG_RAW_INFO(" GPIOTE Drivers init (nrf_drv_gpiote_init) Response: %d\r\n", err_code);
+  NRF_LOG_FLUSH();
   APP_ERROR_CHECK(err_code);
   // 2. Set DRDY as input:
-  nrf_gpio_pin_dir_set(ADAS1000_4_DRDY, NRF_GPIO_PIN_DIR_INPUT); 
+  nrf_gpio_pin_dir_set(ADAS1000_4_DRDY, NRF_GPIO_PIN_DIR_INPUT);
   // 3. Set gpiote input handler:
   bool is_high_accuracy = true;
   nrf_drv_gpiote_in_config_t in_config = GPIOTE_CONFIG_IN_SENSE_HITOLO(is_high_accuracy);
-    in_config.is_watcher = true;
-    in_config.pull = NRF_GPIO_PIN_NOPULL;
+  in_config.is_watcher = true;
+  in_config.pull = NRF_GPIO_PIN_NOPULL;
   err_code = nrf_drv_gpiote_in_init(ADAS1000_4_DRDY, &in_config, in_pin_handler);
-  NRF_LOG_RAW_INFO(" DRDY GPIOTE_IN INIT: %d: \r\n", err_code); NRF_LOG_FLUSH();
+  NRF_LOG_RAW_INFO(" DRDY GPIOTE_IN INIT: %d: \r\n", err_code);
+  NRF_LOG_FLUSH();
   APP_ERROR_CHECK(err_code);
   nrf_drv_gpiote_in_event_enable(ADAS1000_4_DRDY, true);
   // Disable until everything else (BLE/SD) is up
-//  */
+  //  */
 }
 
 static void wait_for_event(void) {
@@ -727,6 +710,9 @@ int main(void) {
 #if ADAS1000_4
   adas_gpio_init();
 #endif
+#if defined(APP_TIMER_SAMPLING) && APP_TIMER_SAMPLING == 1
+  m_samples = 0;
+#endif
   ble_stack_init();
   gap_params_init();
   gatt_init();
@@ -734,22 +720,22 @@ int main(void) {
   services_init();
   conn_params_init();
 #if defined(ADAS1000_4) // Power Up Routine (See Datasheet):
+  adas_spi_init();
   adas_powerup();
   adas_reset_regs(); // Uses gpio
-  adas_spi_init();
   // Write Default Registers:
-//  adas_write_default_registers();
+  adas_write_default_registers();
   // Begin Transactions:
 //  adas_begin_frame_transactions();
+  // TODO: Send first read command (7 bytes), and see if it continues:
+  adas_read_frames(8);
+  m_connected = true;
 #endif
   // Start execution.
   application_timers_start();
   advertising_start();
   NRF_LOG_RAW_INFO(" BLE Advertising Start! \r\n");
   NRF_LOG_FLUSH();
-#if defined(APP_TIMER_SAMPLING) && APP_TIMER_SAMPLING == 1
-  m_samples = 0;
-#endif
 // Enter main loop
 #if NRF_LOG_ENABLED == 1
   for (;;) {

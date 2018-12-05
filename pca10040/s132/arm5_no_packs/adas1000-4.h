@@ -90,7 +90,11 @@ void adas_read_register(uint8_t addr, uint32_t *value);
 
 void adas_write_default_registers(void);
 
+void adas_read_default_registers(void);
+
 void adas_begin_frame_transactions(void); 
+
+void adas_read_frames(uint8_t number_frames);
 
 #endif
 

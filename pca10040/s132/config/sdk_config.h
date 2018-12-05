@@ -2158,7 +2158,7 @@
  
 
 #ifndef SPI0_USE_EASY_DMA
-#define SPI0_USE_EASY_DMA 1
+#define SPI0_USE_EASY_DMA 0
 #endif
 
 // <o> SPI0_DEFAULT_FREQUENCY  - SPI frequency
@@ -3976,7 +3976,7 @@
 // <2=> BLOCK_IF_FIFO_FULL 
 
 #ifndef SEGGER_RTT_CONFIG_DEFAULT_MODE
-#define SEGGER_RTT_CONFIG_DEFAULT_MODE 0
+#define SEGGER_RTT_CONFIG_DEFAULT_MODE 2
 #endif
 
 // </h> 
