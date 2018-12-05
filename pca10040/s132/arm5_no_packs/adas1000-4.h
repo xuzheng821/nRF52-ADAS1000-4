@@ -94,7 +94,7 @@ void adas_read_default_registers(void);
 
 void adas_begin_frame_transactions(void); 
 
-void adas_read_frames(uint8_t number_frames);
+void adas_read_frames(uint8_t number_frames, ble_eeg_t *p_eeg);
 
 #endif
 

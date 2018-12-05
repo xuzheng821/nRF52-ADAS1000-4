@@ -90,7 +90,7 @@ void adas_write_register(uint8_t addr, uint32_t value) {
 void adas_write_default_registers(void) {
   uint8_t num_registers = 4;
   uint8_t register_addresses[4] = {0x85, 0x8A, 0x81, 0x40};
-  uint32_t registers_values[4] = {0x00E0000A, 0x001F9600, 0x00E000E6/*0x00E00406*/, 0x00000000};
+  uint32_t registers_values[4] = {0x00E0000A, 0x001FFE88/*0x001F9600*/, 0x00E000C6, 0x00000000};
   uint8_t i;
   for (i = 0; i < num_registers; i++) {
     adas_write_register(register_addresses[i], registers_values[i]);
@@ -114,14 +114,13 @@ void adas_read_register(uint8_t addr, uint32_t *value) {
 
 void adas_read_default_registers(void) {
     uint8_t num_registers = 4;
-    uint8_t register_addresses[4] = {0x85, 0x8A, 0x81, 0x40};
+    uint8_t register_addresses[4] = {0x05, 0x0A, 0x01, 0x40};
     uint8_t i;
     for (i = 0; i < num_registers; i++) {
       uint32_t response;
       adas_read_register(register_addresses[i], &response);
       nrf_delay_ms(1);
       NRF_LOG_HEXDUMP_DEBUG(response, 4);
-      
     }
 }
 
@@ -131,23 +130,19 @@ void adas_begin_frame_transactions(void) {
   NRF_LOG_HEXDUMP_DEBUG(response, 4);
 }
 
-void adas_read_frames(uint8_t number_frames) {
-    uint8_t tx_data[4 * number_frames];
-    memset(tx_data, 0, 4 * number_frames);
-
+void adas_read_frames(uint8_t number_frames, ble_eeg_t *p_eeg) {
     uint8_t rx_data[4 * number_frames];
     memset(rx_data, 0, 4 * number_frames);
     
     spi_xfer_done = false;
-    APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, tx_data, 4 * number_frames, rx_data, 4 * number_frames));
+    APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, rx_data, 4 * number_frames, rx_data, 4 * number_frames));
     while (!spi_xfer_done) {
       __WFE();
     }
-    NRF_LOG_HEXDUMP_DEBUG(rx_data, 4*number_frames);
+//    NRF_LOG_HEXDUMP_DEBUG(rx_data, 4*number_frames);
+    // Add frames to ECG Ch Data (24-bit)
+    memcpy_fast(&p_eeg->eeg_ch1_buffer[p_eeg->eeg_ch1_count], &rx_data[5], 3);
+    memcpy_fast(&p_eeg->eeg_ch2_buffer[p_eeg->eeg_ch1_count], &rx_data[9], 3);
+    memcpy_fast(&p_eeg->eeg_ch3_buffer[p_eeg->eeg_ch1_count], &rx_data[13], 3);
+    p_eeg->eeg_ch1_count += 3;
 }
-
-//void adas_read_datapoint(void) {
-//  uint32_t response = 0x00000000;
-//  adas_read_register(0x00, &response);
-//  NRF_LOG_HEXDUMP_DEBUG(response, 4);
-//}

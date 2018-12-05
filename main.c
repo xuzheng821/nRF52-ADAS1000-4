@@ -165,7 +165,7 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t *p_file_name) {
 static void m_sampling_timeout_handler(void *p_context) {
   UNUSED_PARAMETER(p_context);
 #if defined(APP_TIMER_SAMPLING) && APP_TIMER_SAMPLING == 1
-  NRF_LOG_INFO("SAMPLE RATE = %dHz \r\n", m_samples);
+  NRF_LOG_INFO("Sample Rate = %dHz \r\n", m_samples);
   m_samples = 0;
 #endif
 }
@@ -383,6 +383,18 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
   }
 }
 
+
+static void enable_adas(void) {
+#if defined(ADAS1000_4) // Power Up Routine (See Datasheet):
+  adas_powerup();
+  adas_spi_init();
+  adas_reset_regs(); // Uses gpio
+  // Write Default Registers:
+  adas_write_default_registers();
+#endif
+}
+
+
 /**@brief Function for handling the Application's BLE Stack events.
  *
  * @param[in] p_ble_evt  Bluetooth stack event.
@@ -395,12 +407,16 @@ static void on_ble_evt(ble_evt_t *p_ble_evt) {
     NRF_LOG_INFO("Disconnected.\r\n");
     m_connected = false;
     advertising_start();
+    //TODO DISABLE ADAS
+    adas_powerdown();
     break; // BLE_GAP_EVT_DISCONNECTED
 
   case BLE_GAP_EVT_CONNECTED:
     NRF_LOG_INFO("Connected.\r\n");
     m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
     m_connected = true;
+    //NOTE: ENABLE ADAS
+    enable_adas();
     break;
 
   case BLE_GATTC_EVT_TIMEOUT:
@@ -409,6 +425,8 @@ static void on_ble_evt(ble_evt_t *p_ble_evt) {
     err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
         BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
     m_connected = false;
+    //TODO DISABLE ADAS
+    adas_powerdown();
     APP_ERROR_CHECK(err_code);
     break; // BLE_GATTC_EVT_TIMEOUT
 
@@ -419,6 +437,8 @@ static void on_ble_evt(ble_evt_t *p_ble_evt) {
         BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
     APP_ERROR_CHECK(err_code);
     m_connected = false;
+    //TODO DISABLE ADAS
+    adas_powerdown();
     break; // BLE_GATTS_EVT_TIMEOUT
 
   case BLE_EVT_USER_MEM_REQUEST:
@@ -628,20 +648,6 @@ static void advertising_start(void) {
   APP_ERROR_CHECK(err_code);
 }
 
-#if defined(ADAS1000_4)
-void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action) {
-  UNUSED_PARAMETER(pin);
-  UNUSED_PARAMETER(action);
-  // Conduct Actions:
-  m_samples += 1;
-  NRF_LOG_INFO("DRDY, in_pin triggered. \r\n");
-  NRF_LOG_FLUSH();
-  if (m_connected) {
-    adas_read_frames(8);
-  }
-}
-#endif
-
 static void adas_gpio_init(void) {
   /* §1. TPS63051 for 3.3V regulation */
   // EN_ pin
@@ -668,11 +674,15 @@ static void adas_gpio_init(void) {
   //~PD:
   nrf_gpio_pin_dir_set(ADAS1000_4_PWDN, NRF_GPIO_PIN_DIR_OUTPUT);
   nrf_gpio_cfg_output(ADAS1000_4_PWDN);
+  //TODO: TEMP: HOLD CS
 
   adas_powerdown();
   //  /*
   // Initialize DRDY as Input:
+  nrf_gpio_pin_dir_set(ADAS1000_4_DRDY, NRF_GPIO_PIN_DIR_INPUT);
+  nrf_gpio_cfg_input(ADAS1000_4_DRDY, NRF_GPIO_PIN_NOPULL);
   // 1. Initialize GPIOTE Drivers:
+  /* NOTE: Ignore this: 
   uint32_t err_code;
   if (!nrf_drv_gpiote_is_init()) {
     err_code = nrf_drv_gpiote_init();
@@ -681,17 +691,16 @@ static void adas_gpio_init(void) {
   NRF_LOG_FLUSH();
   APP_ERROR_CHECK(err_code);
   // 2. Set DRDY as input:
-  nrf_gpio_pin_dir_set(ADAS1000_4_DRDY, NRF_GPIO_PIN_DIR_INPUT);
   // 3. Set gpiote input handler:
   bool is_high_accuracy = true;
   nrf_drv_gpiote_in_config_t in_config = GPIOTE_CONFIG_IN_SENSE_HITOLO(is_high_accuracy);
   in_config.is_watcher = true;
-  in_config.pull = NRF_GPIO_PIN_NOPULL;
+  in_config.pull = NRF_GPIO_PIN_PULLDOWN;
   err_code = nrf_drv_gpiote_in_init(ADAS1000_4_DRDY, &in_config, in_pin_handler);
   NRF_LOG_RAW_INFO(" DRDY GPIOTE_IN INIT: %d: \r\n", err_code);
   NRF_LOG_FLUSH();
   APP_ERROR_CHECK(err_code);
-  nrf_drv_gpiote_in_event_enable(ADAS1000_4_DRDY, true);
+  nrf_drv_gpiote_in_event_enable(ADAS1000_4_DRDY, true);*/
   // Disable until everything else (BLE/SD) is up
   //  */
 }
@@ -719,18 +728,6 @@ int main(void) {
   advertising_init();
   services_init();
   conn_params_init();
-#if defined(ADAS1000_4) // Power Up Routine (See Datasheet):
-  adas_spi_init();
-  adas_powerup();
-  adas_reset_regs(); // Uses gpio
-  // Write Default Registers:
-  adas_write_default_registers();
-  // Begin Transactions:
-//  adas_begin_frame_transactions();
-  // TODO: Send first read command (7 bytes), and see if it continues:
-  adas_read_frames(8);
-  m_connected = true;
-#endif
   // Start execution.
   application_timers_start();
   advertising_start();
@@ -739,8 +736,18 @@ int main(void) {
 // Enter main loop
 #if NRF_LOG_ENABLED == 1
   for (;;) {
-    if (!NRF_LOG_PROCESS()) {
-      power_manage();
+//    if (!NRF_LOG_PROCESS()) {
+//      power_manage();
+//    }
+    if (m_connected && !nrf_gpio_pin_read(ADAS1000_4_DRDY)) {
+      adas_read_frames(4, &m_eeg);
+      if (m_eeg.eeg_ch1_count == EEG_PACKET_LENGTH) {
+        m_eeg.eeg_ch1_count = 0;
+        ble_eeg_update_4ch(&m_eeg);
+      }
+      m_samples+=1;
+    } else {
+      NRF_LOG_PROCESS();
     }
   }
 #endif
