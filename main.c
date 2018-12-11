@@ -504,7 +504,6 @@ static void sys_evt_dispatch(uint32_t sys_evt) {
   // Dispatch the system event to the fstorage module, where it will be
   // dispatched to the Flash Data Storage (FDS) module.
   fs_sys_event_handler(sys_evt);
-
   // Dispatch to the Advertising module last, since it will check if there are any
   // pending flash operations in fstorage. Let fstorage process system events first,
   // so that it can report correctly to the Advertising module.
@@ -736,11 +735,8 @@ int main(void) {
 // Enter main loop
 #if NRF_LOG_ENABLED == 1
   for (;;) {
-//    if (!NRF_LOG_PROCESS()) {
-//      power_manage();
-//    }
     if (m_connected && !nrf_gpio_pin_read(ADAS1000_4_DRDY)) {
-      adas_read_frames(4, &m_eeg);
+      adas_read_frames(7, &m_eeg);
       if (m_eeg.eeg_ch1_count == EEG_PACKET_LENGTH) {
         m_eeg.eeg_ch1_count = 0;
         ble_eeg_update_4ch(&m_eeg);

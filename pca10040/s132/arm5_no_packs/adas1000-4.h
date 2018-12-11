@@ -31,9 +31,6 @@
 #include "ble_eeg.h"
 #include <stdint.h>
 
-// Number of Registers:
-#define ADAS1000_4_NUM_REGS 0x41
-
 // Define Register Addresses:
 #define ADAS1000_4_REGADDR_NOP 0x00
 #define ADAS1000_4_REGADDR_ECGCTL 0x01

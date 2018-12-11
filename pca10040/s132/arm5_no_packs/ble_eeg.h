@@ -56,7 +56,7 @@
 #define BLE_UUID_EEG_CH4_CHAR 0xEEF4
 
 #if SAMPLE_RATE == 250
-#define EEG_PACKET_LENGTH 60
+#define EEG_PACKET_LENGTH 168
 #else
 #define EEG_PACKET_LENGTH 246
 #endif
