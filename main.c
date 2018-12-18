@@ -716,6 +716,7 @@ static void adas_gpio_init(void) {
 static void wait_for_event(void) {
   (void)sd_app_evt_wait();
 }
+
 /**@brief Function for application main entry.
  */
 int main(void) {
@@ -748,7 +749,7 @@ int main(void) {
       adas_read_frames(7, &m_eeg);
       if (m_eeg.eeg_ch1_count == EEG_PACKET_LENGTH) {
         m_eeg.eeg_ch1_count = 0;
-        ble_eeg_update_4ch(&m_eeg);
+        ble_eeg_update_2ch(&m_eeg);
       }
       m_samples+=1;
     } else {

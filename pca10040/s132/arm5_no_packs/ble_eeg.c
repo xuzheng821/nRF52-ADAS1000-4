@@ -308,7 +308,7 @@ void ble_eeg_service_init(ble_eeg_t *p_eeg, const ble_eeg_init_t *p_eeg_init) {
   eeg_ch4_char_add(p_eeg);
 }
 
-void ble_eeg_update_4ch(ble_eeg_t *p_eeg) {
+void ble_eeg_update_2ch(ble_eeg_t *p_eeg) {
   //packet 1:
   uint32_t err_code;
   if (p_eeg->conn_handle != BLE_CONN_HANDLE_INVALID) {
@@ -340,23 +340,6 @@ void ble_eeg_update_4ch(ble_eeg_t *p_eeg) {
   if (err_code == NRF_ERROR_RESOURCES) {
     NRF_LOG_INFO("sd_ble_gatts_hvx() ERR/RES: 0x%x\r\n", err_code);
   }
-
-  //Packet 3
-  if (p_eeg->conn_handle != BLE_CONN_HANDLE_INVALID) {
-    uint16_t hvx_len = EEG_PACKET_LENGTH;
-    ble_gatts_hvx_params_t const hvx_params = {
-        .handle = p_eeg->eeg_ch3_handles.value_handle,
-        .type = BLE_GATT_HVX_NOTIFICATION,
-        .offset = 0,
-        .p_len = &hvx_len,
-        .p_data = p_eeg->eeg_ch3_buffer,
-    };
-    err_code = sd_ble_gatts_hvx(p_eeg->conn_handle, &hvx_params);
-  }
-  if (err_code == NRF_ERROR_RESOURCES) {
-    NRF_LOG_INFO("sd_ble_gatts_hvx() ERR/RES: 0x%x\r\n", err_code);
-  }
-
 }
 
 void ble_eeg_update_configuration(ble_eeg_t *p_eeg, bool notify) {

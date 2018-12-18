@@ -144,8 +144,7 @@ void adas_read_frames(uint8_t number_frames, ble_eeg_t *p_eeg) {
     //NRF_LOG_HEXDUMP_DEBUG(rx_data, 4*number_frames);
     // Add frames to ECG Ch Data (24-bit)
     memcpy_fast(&p_eeg->eeg_ch1_buffer[p_eeg->eeg_ch1_count], &rx_data[5], 3);
-    memcpy_fast(&p_eeg->eeg_ch2_buffer[p_eeg->eeg_ch1_count], &rx_data[17], 3);
-    memcpy_fast(&p_eeg->eeg_ch3_buffer[p_eeg->eeg_ch1_count], &rx_data[21], 3);
+    memcpy_fast(&p_eeg->eeg_ch2_buffer[p_eeg->eeg_ch1_count], &rx_data[21], 3);
     p_eeg->eeg_ch1_count += 3;
     //memcpy_fast(&p_eeg->eeg_ch1_buffer[p_eeg->eeg_ch1_count], &rx_data[0], 4 * number_frames);
     //p_eeg->eeg_ch1_count += (4*number_frames);

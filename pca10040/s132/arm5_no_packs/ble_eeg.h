@@ -89,10 +89,8 @@ struct ble_eeg_s {
   ble_gatts_char_handles_t eeg_ch2_handles;             /**< Handles related to the our body V measure characteristic. */
   ble_gatts_char_handles_t eeg_ch3_handles;             /**< Handles related to the our body V measure characteristic. */
   ble_gatts_char_handles_t eeg_ch4_handles;             /**< Handles related to the our body V measure characteristic. */
-  uint8_t eeg_ch1_buffer[EEG_PACKET_LENGTH];            //246 or 4* =
-  uint8_t eeg_ch2_buffer[EEG_PACKET_LENGTH];            //246 or 4* =
-  uint8_t eeg_ch3_buffer[EEG_PACKET_LENGTH];
-  uint8_t eeg_ch4_buffer[EEG_PACKET_LENGTH];
+  uint8_t eeg_ch1_buffer[EEG_PACKET_LENGTH];            
+  uint8_t eeg_ch2_buffer[EEG_PACKET_LENGTH];            
   uint16_t eeg_ch1_count;
 };
 
@@ -112,6 +110,6 @@ void ble_eeg_on_ble_evt(ble_eeg_t *p_eeg, ble_evt_t *p_ble_evt);
 */
 void ble_eeg_update_configuration(ble_eeg_t *p_eeg, bool notify);
 
-void ble_eeg_update_4ch(ble_eeg_t *p_eeg);
+void ble_eeg_update_2ch(ble_eeg_t *p_eeg);
 
 #endif // BLE_EEG_H__
