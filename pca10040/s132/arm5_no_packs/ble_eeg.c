@@ -96,7 +96,7 @@ static uint32_t eeg_adas_config_char_add(ble_eeg_t *p_eeg, const ble_eeg_init_t 
   attr_char_value.init_len = ADAS1000_4_REGISTER_LENGTH;
   attr_char_value.init_offs = 0;
   attr_char_value.max_len = ADAS1000_4_REGISTER_LENGTH;
-  attr_char_value.p_value = p_eeg->adas1000_4_current_configuration;
+  attr_char_value.p_value = &p_eeg->adas1000_4_current_configuration;
 
   return sd_ble_gatts_characteristic_add(p_eeg->service_handle,
       &char_md,
