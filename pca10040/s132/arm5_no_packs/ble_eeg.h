@@ -55,6 +55,8 @@
 #define BLE_UUID_EEG_CH3_CHAR 0xEEF3
 #define BLE_UUID_EEG_CH4_CHAR 0xEEF4
 
+#define ADAS1000_4_REGISTER_LENGTH 36
+
 #if SAMPLE_RATE == 250
 #define EEG_PACKET_LENGTH 168
 #else
@@ -78,9 +80,11 @@ struct ble_eeg_s {
   uint8_t uuid_type;
   uint16_t conn_handle;                                 /**< Event handler to be called for handling events in the Biopotential Measurement Service. */
   uint16_t service_handle;                              /**< Handle of ble Service (as provided by the BLE stack). */
-  ble_gatts_char_handles_t ads1299_config_char_handles; /**< Handles related to the our body V measure characteristic. */
+
+  ble_gatts_char_handles_t adas1000_4_config_char_handles; /**< Handles related to the our body V measure characteristic. */
   ble_eeg_write_config_handler_t eeg_config_handler;
-  uint8_t ads1299_current_configuration[23];
+  uint32_t adas1000_4_current_configuration[9];
+
   ble_gatts_char_handles_t eeg_ch1_handles;             /**< Handles related to the our body V measure characteristic. */
   ble_gatts_char_handles_t eeg_ch2_handles;             /**< Handles related to the our body V measure characteristic. */
   ble_gatts_char_handles_t eeg_ch3_handles;             /**< Handles related to the our body V measure characteristic. */
@@ -107,7 +111,7 @@ void ble_eeg_on_ble_evt(ble_eeg_t *p_eeg, ble_evt_t *p_ble_evt);
 *
 */
 void ble_eeg_update_configuration(ble_eeg_t *p_eeg, bool notify);
-void ble_eeg_update_1ch_v2(ble_eeg_t *p_eeg);
+
 void ble_eeg_update_4ch(ble_eeg_t *p_eeg);
 
 #endif // BLE_EEG_H__

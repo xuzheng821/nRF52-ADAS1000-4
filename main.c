@@ -264,7 +264,18 @@ static void on_yys_evt(ble_yy_service_t     * p_yy_service,
 */
 static void eeg_config_handler(uint16_t conn_handle, ble_eeg_t *p_eeg, uint8_t *data) {
   NRF_LOG_INFO("REGISTER DATA RECEIVED: \n");
-  NRF_LOG_HEXDUMP_DEBUG(data, 23);
+  NRF_LOG_HEXDUMP_DEBUG(data, ADAS1000_4_REGISTER_LENGTH);
+  // TODO: Write New Configuration:
+  m_connected = false;
+  m_eeg.eeg_ch1_count = 0;
+  adas_powerdown();
+  adas_powerup();
+  adas_reset_regs(); // Uses gpio
+  adas_write_registers_new(&m_eeg, data);
+  // Set new values in BLE Characteristic:
+  ble_eeg_update_configuration(&m_eeg, true);
+  // TODO: Begin Sampling again>
+  m_connected = true;
 }
 
 /**@brief Function for initializing services that will be used by the application.
@@ -390,7 +401,8 @@ static void enable_adas(void) {
   adas_spi_init();
   adas_reset_regs(); // Uses gpio
   // Write Default Registers:
-  adas_write_default_registers();
+  adas_write_default_registers(&m_eeg, false);
+  ble_eeg_update_configuration(&m_eeg, true);
 #endif
 }
 
@@ -407,7 +419,7 @@ static void on_ble_evt(ble_evt_t *p_ble_evt) {
     NRF_LOG_INFO("Disconnected.\r\n");
     m_connected = false;
     advertising_start();
-    //TODO DISABLE ADAS
+    // TODO: Don't power down entirely. 
     adas_powerdown();
     break; // BLE_GAP_EVT_DISCONNECTED
 
@@ -415,7 +427,6 @@ static void on_ble_evt(ble_evt_t *p_ble_evt) {
     NRF_LOG_INFO("Connected.\r\n");
     m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
     m_connected = true;
-    //NOTE: ENABLE ADAS
     enable_adas();
     break;
 
@@ -425,7 +436,6 @@ static void on_ble_evt(ble_evt_t *p_ble_evt) {
     err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
         BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
     m_connected = false;
-    //TODO DISABLE ADAS
     adas_powerdown();
     APP_ERROR_CHECK(err_code);
     break; // BLE_GATTC_EVT_TIMEOUT
@@ -437,7 +447,6 @@ static void on_ble_evt(ble_evt_t *p_ble_evt) {
         BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
     APP_ERROR_CHECK(err_code);
     m_connected = false;
-    //TODO DISABLE ADAS
     adas_powerdown();
     break; // BLE_GATTS_EVT_TIMEOUT
 

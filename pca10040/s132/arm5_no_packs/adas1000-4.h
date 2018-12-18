@@ -81,17 +81,15 @@ void adas_powerup(void);
 
 void adas_reset_regs(void);
 
-void adas_write_register(uint8_t addr, uint32_t value);
+void adas_write_register(uint32_t value);
 
 void adas_read_register(uint8_t addr, uint32_t *value);
 
-void adas_write_default_registers(void);
-
-void adas_read_default_registers(void);
-
-void adas_begin_frame_transactions(void); 
+void adas_write_default_registers(ble_eeg_t *p_eeg, bool new_config);
 
 void adas_read_frames(uint8_t number_frames, ble_eeg_t *p_eeg);
+
+void adas_write_registers_new(ble_eeg_t *p_eeg, uint8_t *new_register_values);
 
 #endif
 

@@ -12,7 +12,7 @@
 //#include "nrf.h"
 #//include <stdio.h>
 
-uint8_t ADAS1000_4_DEFAULT_REGS[] = {0x00};
+uint32_t ADAS1000_4_DEFAULT_REGS[] = {0x85A0000A, 0x8A1F8E03, 0x81A004C6, 0x83002019, 0x84000000, 0x87000000, 0x8E000000, 0x8F000000, 0x40000000};
 
 static const nrf_drv_spi_t spi = NRF_DRV_SPI_INSTANCE(0);
 static volatile bool spi_xfer_done;
@@ -72,10 +72,10 @@ void adas_reset_regs(void) {
   NRF_LOG_INFO(" ADAS1000-4 Registers Reset. \r\n");
 }
 
-void adas_write_register(uint8_t addr, uint32_t value) {
+void adas_write_register(uint32_t value) {
   // TX DATA [REG ADDR, BITS 23:16, BITS 15:8, BITS 7:0]
   uint8_t tx_data[4];
-  tx_data[0] = (uint8_t) 0x00 + addr;
+  tx_data[0] = (uint8_t)((value >> 24) & 0xFF);
   tx_data[1] = (uint8_t)((value >> 16) & 0xFF);
   tx_data[2] = (uint8_t)((value >> 8) & 0xFF);
   tx_data[3] = (uint8_t)(value & 0xFF);
@@ -87,19 +87,33 @@ void adas_write_register(uint8_t addr, uint32_t value) {
   }
 }
 
-void adas_write_default_registers(void) {
-  uint8_t num_registers = 6;
-  //uint8_t register_addresses[4] = {0x85, 0x8A, 0x81, 0x40};
-  //uint32_t registers_values[4] = {0x00E0000A, 0x001FFE88, 0x00C000C6, 0x00000000};
-  // Resp Config 1 - Works (Frame Count = 6)
-//  uint8_t register_addresses[5] = {0x85, 0x8A, 0x81, 0x83, 0x40};
-//  uint32_t registers_values[5] = {0x00E0000A, 0x001FCE83, 0x00E000C6,0x00002019, 0x00000000};
-  // Resp Config 1 - Works (Frame Count = 7)
-  uint8_t register_addresses[6] = {0x85, 0x8A, 0x81, 0x83, 0x84, 0x40};
-  uint32_t registers_values[6] = {0x00A0000A, 0x001F8E0B, 0x00A004C6, 0x00002019, 0x00000E01, 0x00000000};
+void adas_write_register_array(uint8_t *value) {
+  spi_xfer_done = false;
+  NRF_LOG_HEXDUMP_DEBUG(value, 4);
+  APP_ERROR_CHECK(nrf_drv_spi_transfer(&spi, value, 4, NULL, NULL));
+  while (!spi_xfer_done) {
+    __WFE();
+  }
+}
+
+void adas_write_registers_new(ble_eeg_t *p_eeg, uint8_t *new_register_values) {
+  uint8_t num_registers = 9;
+  // Copy default regs to update current config on BLE side
+  memcpy_fast(&p_eeg->adas1000_4_current_configuration[0], &new_register_values[0], num_registers * sizeof(uint32_t));
+  uint8_t i;
+  adas_write_default_registers(p_eeg, true);
+}
+
+void adas_write_default_registers(ble_eeg_t *p_eeg, bool new_config) {
+  uint8_t num_registers = 9;
+  // Copy default regs to update current config on BLE side
+  if (!new_config) {
+    memcpy_fast(&p_eeg->adas1000_4_current_configuration[0], &ADAS1000_4_DEFAULT_REGS[0], num_registers * sizeof(uint32_t));
+  }
+  // Cycle through and write each of the words to the respective registers
   uint8_t i;
   for (i = 0; i < num_registers; i++) {
-    adas_write_register(register_addresses[i], registers_values[i]);
+      adas_write_register(p_eeg->adas1000_4_current_configuration[i]);
   }
   NRF_LOG_INFO(" ADAS1000-4 Default Registers Written. \r\n");
 }
@@ -118,24 +132,6 @@ void adas_read_register(uint8_t addr, uint32_t *value) {
   *value = ((uint32_t)rx_data[0] << 24) + ((uint32_t)rx_data[1] << 16) + ((uint32_t)rx_data[2] << 8) + ((uint32_t)rx_data[3] << 0);
 }
 
-void adas_read_default_registers(void) {
-    uint8_t num_registers = 4;
-    uint8_t register_addresses[4] = {0x05, 0x0A, 0x01, 0x40};
-    uint8_t i;
-    for (i = 0; i < num_registers; i++) {
-      uint32_t response;
-      adas_read_register(register_addresses[i], &response);
-      nrf_delay_ms(1);
-      NRF_LOG_HEXDUMP_DEBUG(response, 4);
-    }
-}
-
-void adas_begin_frame_transactions(void) {
-  uint32_t response;
-  adas_read_register(0x40, &response);
-  NRF_LOG_HEXDUMP_DEBUG(response, 4);
-}
-
 void adas_read_frames(uint8_t number_frames, ble_eeg_t *p_eeg) {
     uint8_t rx_data[4 * number_frames];
     memset(rx_data, 0, 4 * number_frames);
@@ -147,10 +143,10 @@ void adas_read_frames(uint8_t number_frames, ble_eeg_t *p_eeg) {
     }
     //NRF_LOG_HEXDUMP_DEBUG(rx_data, 4*number_frames);
     // Add frames to ECG Ch Data (24-bit)
-//    memcpy_fast(&p_eeg->eeg_ch1_buffer[p_eeg->eeg_ch1_count], &rx_data[5], 3);
-//    memcpy_fast(&p_eeg->eeg_ch2_buffer[p_eeg->eeg_ch1_count], &rx_data[9], 3);
-//    memcpy_fast(&p_eeg->eeg_ch3_buffer[p_eeg->eeg_ch1_count], &rx_data[13], 3);
-//p_eeg->eeg_ch1_count += 3;
-    memcpy_fast(&p_eeg->eeg_ch1_buffer[p_eeg->eeg_ch1_count], &rx_data[0], 4 * number_frames);
-    p_eeg->eeg_ch1_count += (4*number_frames);
+    memcpy_fast(&p_eeg->eeg_ch1_buffer[p_eeg->eeg_ch1_count], &rx_data[5], 3);
+    memcpy_fast(&p_eeg->eeg_ch2_buffer[p_eeg->eeg_ch1_count], &rx_data[17], 3);
+    memcpy_fast(&p_eeg->eeg_ch3_buffer[p_eeg->eeg_ch1_count], &rx_data[21], 3);
+    p_eeg->eeg_ch1_count += 3;
+    //memcpy_fast(&p_eeg->eeg_ch1_buffer[p_eeg->eeg_ch1_count], &rx_data[0], 4 * number_frames);
+    //p_eeg->eeg_ch1_count += (4*number_frames);
 }
