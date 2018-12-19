@@ -57,11 +57,7 @@
 
 #define ADAS1000_4_REGISTER_LENGTH 36
 
-#if SAMPLE_RATE == 250
-#define EEG_PACKET_LENGTH 168
-#else
 #define EEG_PACKET_LENGTH 246
-#endif
 
 //Forward declaration of ble_eeg_t type:
 typedef struct ble_eeg_s ble_eeg_t;

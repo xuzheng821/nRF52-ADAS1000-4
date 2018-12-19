@@ -27,8 +27,6 @@
 #include "nrf_log.h"
 #include <string.h>
 
-#define MAX_LEN_BLE_PACKET_BYTES 246
-
 static void on_write(ble_eeg_t *p_eeg, ble_evt_t *p_ble_evt) {
   ble_gatts_evt_write_t *p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
   if ((p_evt_write->handle == p_eeg->adas1000_4_config_char_handles.value_handle) && (p_evt_write->len >= 1) && (p_eeg->eeg_config_handler != NULL)) {
@@ -96,7 +94,7 @@ static uint32_t eeg_adas_config_char_add(ble_eeg_t *p_eeg, const ble_eeg_init_t 
   attr_char_value.init_len = ADAS1000_4_REGISTER_LENGTH;
   attr_char_value.init_offs = 0;
   attr_char_value.max_len = ADAS1000_4_REGISTER_LENGTH;
-  attr_char_value.p_value = &p_eeg->adas1000_4_current_configuration;
+  attr_char_value.p_value = (uint8_t *) p_eeg->adas1000_4_current_configuration;
 
   return sd_ble_gatts_characteristic_add(p_eeg->service_handle,
       &char_md,
@@ -304,8 +302,8 @@ void ble_eeg_service_init(ble_eeg_t *p_eeg, const ble_eeg_init_t *p_eeg_init) {
 
   eeg_ch1_char_add(p_eeg);
   eeg_ch2_char_add(p_eeg);
-  eeg_ch3_char_add(p_eeg);
-  eeg_ch4_char_add(p_eeg);
+//  eeg_ch3_char_add(p_eeg);
+//  eeg_ch4_char_add(p_eeg);
 }
 
 void ble_eeg_update_2ch(ble_eeg_t *p_eeg) {
